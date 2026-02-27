@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="460" viewBox="0 0 720 460">
+  <defs>
+    <style>
+      .bg { fill: #1e1e2e; }
+      .titlebar { fill: #313244; }
+      .t { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', Menlo, monospace; font-size: 13px; fill: #cdd6f4; }
+      .dim { fill: #6c7086; }
+      .green { fill: #a6e3a1; }
+      .blue { fill: #89b4fa; }
+      .mauve { fill: #cba6f7; }
+      .highlight { fill: #313244; }
+      .border { stroke: #585b70; stroke-width: 1; fill: none; }
+    </style>
+  </defs>
+
+  <!-- Window chrome -->
+  <rect class="bg" width="720" height="460" rx="10"/>
+  <rect class="titlebar" width="720" height="36" rx="10"/>
+  <rect class="bg" x="0" y="26" width="720" height="10"/>
+  <circle fill="#f38ba8" cx="20" cy="18" r="6"/>
+  <circle fill="#f9e2af" cx="40" cy="18" r="6"/>
+  <circle fill="#a6e3a1" cx="60" cy="18" r="6"/>
+  <text class="t dim" x="360" y="22" text-anchor="middle">s</text>
+
+  <!-- fzf border -->
+  <rect class="border" x="16" y="46" width="688" height="400" rx="4"/>
+
+  <!-- Prompt -->
+  <text class="t green" x="28" y="68">screen&gt; </text>
+  <text class="t dim" x="28" y="86">Enter: attach | Esc: cancel</text>
+  <line x1="28" y1="94" x2="692" y2="94" stroke="#585b70" stroke-width="1"/>
+
+  <!-- Session list -->
+  <rect class="highlight" x="17" y="100" width="686" height="18" rx="2"/>
+  <text class="t blue" x="28" y="113">&gt; api         (Attached)</text>
+  <text class="t" x="40" y="131">  deploy      (Attached)</text>
+  <text class="t" x="40" y="149">  logs        (Detached)</text>
+  <text class="t" x="40" y="167">  worker      (Attached)</text>
+
+  <!-- Preview separator -->
+  <line x1="28" y1="184" x2="692" y2="184" stroke="#585b70" stroke-width="1"/>
+
+  <!-- Preview content -->
+  <text class="t dim" x="28" y="202">~ $</text>
+  <text class="t" x="58" y="202">git log --oneline -5</text>
+  <text class="t mauve" x="28" y="220">a3f19c2</text>
+  <text class="t" x="90" y="220">fix connection pool timeout handling</text>
+  <text class="t mauve" x="28" y="238">e8810da</text>
+  <text class="t" x="90" y="238">add retry logic to webhook delivery</text>
+  <text class="t mauve" x="28" y="256">7f2c4b1</text>
+  <text class="t" x="90" y="256">update rate limiter defaults</text>
+  <text class="t mauve" x="28" y="274">bb95a07</text>
+  <text class="t" x="90" y="274">migrate sessions table to new schema</text>
+  <text class="t mauve" x="28" y="292">1c3de90</text>
+  <text class="t" x="90" y="292">bump dependencies</text>
+  <text class="t dim" x="28" y="318">~ $</text>
+  <text class="t" x="58" y="318">docker ps --format "table {{.Names}}\t{{.Status}}"</text>
+  <text class="t" x="28" y="336">NAMES          STATUS</text>
+  <text class="t" x="28" y="354">api            Up 3 days</text>
+  <text class="t" x="28" y="372">redis          Up 3 days</text>
+  <text class="t" x="28" y="390">postgres-14    Up 3 days (healthy)</text>
+  <text class="t dim" x="28" y="416">~ $</text>
+
+  <!-- Count -->
+  <text class="t dim" x="28" y="436">  4/4</text>
+</svg>
