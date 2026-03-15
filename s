@@ -5,40 +5,18 @@ preview_lines=40
 script_name="$(basename "$0")"
 
 render_preview() {
-  local session="$1" window="${2:-0}" lines="${3:-$preview_lines}"
-  local tmpfile="/tmp/.s-preview-$$"
-
-  screen -S "$session" -p "$window" -X hardcopy "$tmpfile" 2>/dev/null || true
-
-  # hardcopy via -X is async; wait briefly for the file
-  for _ in 1 2 3 4 5; do [ -f "$tmpfile" ] && break; sleep 0.05; done
-
-  if [ -f "$tmpfile" ]; then
-    local cols="${COLUMNS:-$(tput cols 2>/dev/null || echo 80)}"
-    tr -d '\000\033' < "$tmpfile" | iconv -f utf-8 -t utf-8 -c | cut -c1-"$cols" | tac | sed '/./,$!d' | tac | tail -n "$lines" || true
-    rm -f "$tmpfile"
-  else
-    echo "[could not capture]"
-  fi
+  local session="$1" lines="${2:-$preview_lines}"
+  shpool hardcopy "$session" 2>/dev/null | tail -n "$lines" || echo "[could not capture]"
 }
 
 if [ "${1:-}" = "--preview" ]; then
-  render_preview "${2:-}" "${3:-0}" "${4:-$preview_lines}"
+  render_preview "${2:-}" "${3:-$preview_lines}"
   exit 0
 fi
 
 if [ "${1:-}" = "--remote-preview" ]; then
-  host="${2:-}"; session="${3:-}"; window="${4:-0}"; lines="${5:-$preview_lines}"
-  ssh ${S_SSH_MUX:-} "$host" bash -s -- "$session" "$window" "$lines" <<'REMOTE'
-    session="$1" window="$2" lines="$3"
-    tmpfile="/tmp/.s-preview-$$"
-    screen -S "$session" -p "$window" -X hardcopy "$tmpfile" 2>/dev/null || true
-    for _ in 1 2 3 4 5; do [ -f "$tmpfile" ] && break; sleep 0.05; done
-    if [ -f "$tmpfile" ]; then
-      tr -d '\000\033' < "$tmpfile" | tac | sed '/./,$!d' | tac | tail -n "$lines"
-      rm -f "$tmpfile"
-    fi
-REMOTE
+  host="${2:-}"; session="${3:-}"; lines="${4:-$preview_lines}"
+  ssh ${S_SSH_MUX:-} "$host" shpool hardcopy "$session" 2>/dev/null | tail -n "$lines"
   exit 0
 fi
 
@@ -61,21 +39,17 @@ if [ $# -ge 1 ] && [[ "$1" == @* ]]; then
   if [ $# -ge 1 ]; then
     # s @host name — attach or create named session
     name="$1"
-    if ssh "${ssh_mux[@]}" "$remote_host" screen -ls 2>/dev/null | tr -d '\r' | grep -qF ".$name"; then
-      exec ssh -t "${ssh_mux[@]}" "$remote_host" screen -d -r "$name"
-    else
-      exec ssh -t "${ssh_mux[@]}" "$remote_host" screen -S "$name"
-    fi
+    exec ssh -t "${ssh_mux[@]}" "$remote_host" shpool attach "$name"
   fi
 
   # s @host — pick from remote sessions
   sessions=()
-  while read -r full_id state; do
-    sessions+=("${full_id}	${full_id#*.}	${state}")
-  done < <(ssh "${ssh_mux[@]}" "$remote_host" screen -ls 2>/dev/null | tr -d '\r' | awk '/\(Attached\)|\(Detached\)/ {print $1, $NF}' | sort -t. -k2)
+  while read -r name status; do
+    sessions+=("${name}	${name}	${status}")
+  done < <(ssh "${ssh_mux[@]}" "$remote_host" shpool list 2>/dev/null | tail -n +2 | awk -F'\t' '{print $1, $3}' | sort)
 
   if [ "${#sessions[@]}" -eq 0 ]; then
-    exec ssh -t "${ssh_mux[@]}" "$remote_host" screen -S "$(date +%Y-%m-%d)"
+    exec ssh -t "${ssh_mux[@]}" "$remote_host" shpool attach "$(date +%Y-%m-%d)"
   fi
 
   if command -v fzf >/dev/null 2>&1; then
@@ -86,19 +60,20 @@ if [ $# -ge 1 ] && [[ "$1" == @* ]]; then
       printf '%s\n' "${sessions[@]}" \
         | fzf \
           --cycle \
+          --ansi \
           --layout=reverse \
           --border \
           --delimiter=$'\t' \
           --with-nth=2,3 \
-          --prompt="screen@${remote_host}> " \
+          --prompt="shpool@${remote_host}> " \
           --header='Enter: attach | Esc: cancel' \
           --listen \
           --bind "start:execute-silent(while sleep 1; do curl -s -XPOST localhost:\$FZF_PORT -d refresh-preview || break; done &)" \
           --preview-window="down,${preview_size},follow" \
-          --preview "S_SSH_MUX='-o ControlMaster=auto -o ControlPath=/tmp/.s-ssh-%r@%h:%p -o ControlPersist=5m' $0 --remote-preview ${remote_host} {1} 0 \$FZF_PREVIEW_LINES"
+          --preview "S_SSH_MUX='-o ControlMaster=auto -o ControlPath=/tmp/.s-ssh-%r@%h:%p -o ControlPersist=5m' $0 --remote-preview ${remote_host} {1} \$FZF_PREVIEW_LINES"
     )"
     [ -z "${selected:-}" ] && exit 0
-    full_id="$(printf '%s' "$selected" | cut -f1)"
+    name="$(printf '%s' "$selected" | cut -f1)"
   else
     echo "Sessions on ${remote_host}:" >&2
     for i in "${!sessions[@]}"; do
@@ -113,30 +88,26 @@ if [ $# -ge 1 ] && [[ "$1" == @* ]]; then
     if ! [[ "$choice" =~ ^[0-9]+$ ]] || [ "$choice" -lt 1 ] || [ "$choice" -gt "${#sessions[@]}" ]; then
       echo "Invalid selection." >&2; exit 2
     fi
-    full_id="$(echo "${sessions[$((choice - 1))]}" | cut -f1)"
+    name="$(echo "${sessions[$((choice - 1))]}" | cut -f1)"
   fi
 
-  exec ssh -t "${ssh_mux[@]}" "$remote_host" screen -d -r "$full_id"
+  exec ssh -t "${ssh_mux[@]}" "$remote_host" shpool attach "$name"
 fi
 
 # s <name> — attach or create
 if [ $# -ge 1 ]; then
   name="$1"
-  if screen -ls 2>/dev/null | grep -qF ".$name"; then
-    exec screen -d -r "$name"
-  else
-    exec screen -S "$name"
-  fi
+  exec shpool attach "$name"
 fi
 
 # s (no args) — pick from running sessions
 sessions=()
-while read -r full_id state; do
-  sessions+=("${full_id}	${full_id#*.}	${state}")
-done < <(screen -ls 2>/dev/null | awk '/\(Attached\)|\(Detached\)/ {print $1, $NF}' | sort -t. -k2)
+while read -r name status; do
+  sessions+=("${name}	${name}	${status}")
+done < <(shpool list 2>/dev/null | tail -n +2 | awk -F'\t' '{print $1, $3}' | sort)
 
 if [ "${#sessions[@]}" -eq 0 ]; then
-  exec screen -S "$(date +%Y-%m-%d)"
+  exec shpool attach "$(date +%Y-%m-%d)"
 fi
 
 if command -v fzf >/dev/null 2>&1; then
@@ -147,19 +118,20 @@ if command -v fzf >/dev/null 2>&1; then
     printf '%s\n' "${sessions[@]}" \
       | fzf \
         --cycle \
+        --ansi \
         --layout=reverse \
         --border \
         --delimiter=$'\t' \
         --with-nth=2,3 \
-        --prompt='screen> ' \
+        --prompt='shpool> ' \
         --header='Enter: attach | Esc: cancel' \
         --listen \
         --bind "start:execute-silent(while sleep 1; do curl -s -XPOST localhost:\$FZF_PORT -d refresh-preview || break; done &)" \
         --preview-window="down,${preview_size},follow" \
-        --preview "$0 --preview {1} 0 \$FZF_PREVIEW_LINES"
+        --preview "$0 --preview {1} \$FZF_PREVIEW_LINES"
   )"
   [ -z "${selected:-}" ] && exit 0
-  full_id="$(printf '%s' "$selected" | cut -f1)"
+  name="$(printf '%s' "$selected" | cut -f1)"
 else
   echo "Sessions:" >&2
   for i in "${!sessions[@]}"; do
@@ -174,12 +146,7 @@ else
   if ! [[ "$choice" =~ ^[0-9]+$ ]] || [ "$choice" -lt 1 ] || [ "$choice" -gt "${#sessions[@]}" ]; then
     echo "Invalid selection." >&2; exit 2
   fi
-  full_id="$(echo "${sessions[$((choice - 1))]}" | cut -f1)"
+  name="$(echo "${sessions[$((choice - 1))]}" | cut -f1)"
 fi
 
-if [ -n "${STY:-}" ]; then
-  screen -X detach
-  exec screen -r "$full_id"
-else
-  exec screen -d -r "$full_id"
-fi
+exec shpool attach "$name"
