@@ -39,7 +39,7 @@ if [ $# -ge 1 ] && [[ "$1" == @* ]]; then
   if [ $# -ge 1 ]; then
     # s @host name — attach or create named session
     name="$1"
-    exec ssh -t "${ssh_mux[@]}" "$remote_host" shpool attach "$name"
+    exec ssh -t "${ssh_mux[@]}" "$remote_host" shpool attach -f "$name"
   fi
 
   # s @host — pick from remote sessions
@@ -91,13 +91,13 @@ if [ $# -ge 1 ] && [[ "$1" == @* ]]; then
     name="$(echo "${sessions[$((choice - 1))]}" | cut -f1)"
   fi
 
-  exec ssh -t "${ssh_mux[@]}" "$remote_host" shpool attach "$name"
+  exec ssh -t "${ssh_mux[@]}" "$remote_host" shpool attach -f "$name"
 fi
 
 # s <name> — attach or create
 if [ $# -ge 1 ]; then
   name="$1"
-  exec shpool attach "$name"
+  exec shpool attach -f "$name"
 fi
 
 # s (no args) — pick from running sessions
@@ -149,4 +149,4 @@ else
   name="$(echo "${sessions[$((choice - 1))]}" | cut -f1)"
 fi
 
-exec shpool attach "$name"
+exec shpool attach -f "$name"
