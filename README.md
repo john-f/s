@@ -1,6 +1,6 @@
 # s
 
-Screen session picker with fzf preview. Works without fzf too.
+[shpool](https://github.com/shell-pool/shpool) session picker with fzf preview. Works without fzf too.
 
 ```
 s myproject        reattach or create "myproject"
@@ -17,15 +17,27 @@ s @host myproject  reattach or create on remote host
 Copy `s` somewhere on your PATH:
 
 ```
-curl -o ~/.local/bin/s https://raw.githubusercontent.com/john-f/s/main/s
+curl -o ~/.local/bin/s https://raw.githubusercontent.com/john-f/s/use-shpool/s
 chmod +x ~/.local/bin/s
 ```
 
-Needs GNU Screen. [fzf](https://github.com/junegunn/fzf) is optional but recommended for the interactive picker with live session previews.
+Needs [shpool](https://github.com/shell-pool/shpool). [fzf](https://github.com/junegunn/fzf) is optional but recommended for the interactive picker with live session previews.
+
+## iTerm2 tab titles
+
+Add this to your `~/.bashrc` (or equivalent) to show the shpool session name in the iTerm2 tab title:
+
+```bash
+case "$TERM" in
+xterm*|rxvt*)
+    PS1="\[\e]0;${SHPOOL_SESSION_NAME:+[$SHPOOL_SESSION_NAME] }\u@\h: \w\a\]$PS1"
+    ;;
+esac
+```
 
 ## Remote sessions
 
-Prefix a hostname with `@` to manage screen sessions on a remote machine via SSH:
+Prefix a hostname with `@` to manage shpool sessions on a remote machine via SSH:
 
 ```
 s @devbox
