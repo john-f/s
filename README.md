@@ -31,9 +31,14 @@ chmod +x ~/.local/bin/s
 
 [fzf](https://github.com/junegunn/fzf) is optional but recommended for the interactive picker with live session previews.
 
-## iTerm2 tab titles
+## iTerm2 session labels
 
-Add this to your `~/.bashrc` (or equivalent) to show the shpool session name in the iTerm2 tab title:
+When `s` attaches to a session, it shows the shpool session name as an iTerm2
+badge overlay. The badge is cleared when the attachment ends, including after
+an attachment error. This also works for sessions selected with `s @host`.
+
+To include the same session name in the iTerm2 tab title, add this to your
+`~/.bashrc` (or equivalent):
 
 ```bash
 case "$TERM" in

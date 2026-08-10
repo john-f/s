@@ -9,6 +9,32 @@ render_preview() {
   shpool hardcopy -- "$session" 2>/dev/null | tail -n "$lines" || echo "[could not capture]"
 }
 
+set_iterm2_badge() {
+  local value="$1" encoded
+  encoded="$(printf '%s' "$value" | base64 | tr -d '\r\n')"
+  printf '\033]1337;SetBadgeFormat=%s\007' "$encoded"
+}
+
+clear_iterm2_badge() {
+  set_iterm2_badge ""
+}
+
+attach_with_badge() {
+  local name="$1" status
+  shift
+
+  set_iterm2_badge "$name"
+  trap clear_iterm2_badge EXIT
+  if "$@"; then
+    status=0
+  else
+    status=$?
+  fi
+  clear_iterm2_badge
+  trap - EXIT
+  return "$status"
+}
+
 if [ "${1:-}" = "--preview" ]; then
   render_preview "${2:-}" "${3:-$preview_lines}"
   exit 0
@@ -47,7 +73,8 @@ if [ $# -ge 1 ] && [[ "$1" == @* ]]; then
     # s @host name — attach or create named session
     name="$1"
     printf -v remote_command 'exec shpool attach -f -- %q' "$name"
-    exec ssh -t "${ssh_mux[@]}" "$remote_host" "$remote_command"
+    attach_with_badge "$name" ssh -t "${ssh_mux[@]}" "$remote_host" "$remote_command"
+    exit $?
   fi
 
   # s @host — pick from remote sessions
@@ -59,7 +86,8 @@ if [ $# -ge 1 ] && [[ "$1" == @* ]]; then
   if [ "${#sessions[@]}" -eq 0 ]; then
     name="$(date +%Y-%m-%d)"
     printf -v remote_command 'exec shpool attach -- %q' "$name"
-    exec ssh -t "${ssh_mux[@]}" "$remote_host" "$remote_command"
+    attach_with_badge "$name" ssh -t "${ssh_mux[@]}" "$remote_host" "$remote_command"
+    exit $?
   fi
 
   if command -v fzf >/dev/null 2>&1; then
@@ -105,13 +133,15 @@ if [ $# -ge 1 ] && [[ "$1" == @* ]]; then
   fi
 
   printf -v remote_command 'exec shpool attach -f -- %q' "$name"
-  exec ssh -t "${ssh_mux[@]}" "$remote_host" "$remote_command"
+  attach_with_badge "$name" ssh -t "${ssh_mux[@]}" "$remote_host" "$remote_command"
+  exit $?
 fi
 
 # s <name> — attach or create
 if [ $# -ge 1 ]; then
   name="$1"
-  exec shpool attach -f -- "$name"
+  attach_with_badge "$name" shpool attach -f -- "$name"
+  exit $?
 fi
 
 # s (no args) — pick from running sessions
@@ -121,7 +151,9 @@ while read -r name status; do
 done < <(shpool list 2>/dev/null | tail -n +2 | awk -F'\t' '{sub(/[[:space:]]+$/, "", $1); print $1, $NF}' | sort)
 
 if [ "${#sessions[@]}" -eq 0 ]; then
-  exec shpool attach -- "$(date +%Y-%m-%d)"
+  name="$(date +%Y-%m-%d)"
+  attach_with_badge "$name" shpool attach -- "$name"
+  exit $?
 fi
 
 if command -v fzf >/dev/null 2>&1; then
@@ -164,4 +196,4 @@ else
   name="$(echo "${sessions[$((choice - 1))]}" | cut -f1)"
 fi
 
-exec shpool attach -f -- "$name"
+attach_with_badge "$name" shpool attach -f -- "$name"

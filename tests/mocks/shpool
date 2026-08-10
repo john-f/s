@@ -11,6 +11,7 @@ case "${1:-}" in
     ;;
   attach)
     printf '%s\n' "$*" > "${S_TEST_LOG:?}"
+    exit "${S_TEST_ATTACH_STATUS:-0}"
     ;;
   *)
     echo "unexpected shpool command: $*" >&2
