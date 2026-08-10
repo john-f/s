@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+for arg in "$@"; do
+  if [ "$arg" = "list" ]; then
+    printf '%s' "${S_TEST_LIST_OUTPUT:-}"
+    exit 0
+  fi
+done
+
+printf '%s\n' "$*" > "${S_TEST_LOG:?}"

@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+case "${1:-}" in
+  list)
+    printf '%s' "${S_TEST_LIST_OUTPUT:-}"
+    ;;
+  hardcopy)
+    printf '%s' "${S_TEST_HARDCOPY_OUTPUT:-}"
+    printf '%s\n' "$*" > "${S_TEST_LOG:?}"
+    ;;
+  attach)
+    printf '%s\n' "$*" > "${S_TEST_LOG:?}"
+    ;;
+  *)
+    echo "unexpected shpool command: $*" >&2
+    exit 2
+    ;;
+esac

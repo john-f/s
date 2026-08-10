@@ -1,6 +1,6 @@
 # s
 
-[shpool](https://github.com/shell-pool/shpool) session picker with fzf preview. Works without fzf too.
+[shpool](https://github.com/john-f/shpool) session picker with fzf preview. Works without fzf too.
 
 ```
 s myproject        reattach or create "myproject"
@@ -14,6 +14,14 @@ s @host myproject  reattach or create on remote host
 
 ## Install
 
+Install the john-f/shpool fork, which adds the `hardcopy` command used for previews:
+
+```bash
+cargo install --git https://github.com/john-f/shpool --locked shpool
+```
+
+If shpool was already running, restart its daemon after installing so the client and daemon use the same protocol.
+
 Copy `s` somewhere on your PATH:
 
 ```
@@ -21,7 +29,7 @@ curl -o ~/.local/bin/s https://raw.githubusercontent.com/john-f/s/use-shpool/s
 chmod +x ~/.local/bin/s
 ```
 
-Needs [shpool](https://github.com/shell-pool/shpool). [fzf](https://github.com/junegunn/fzf) is optional but recommended for the interactive picker with live session previews.
+[fzf](https://github.com/junegunn/fzf) is optional but recommended for the interactive picker with live session previews.
 
 ## iTerm2 tab titles
 

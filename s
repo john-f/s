@@ -6,7 +6,7 @@ script_name="$(basename "$0")"
 
 render_preview() {
   local session="$1" lines="${2:-$preview_lines}"
-  shpool hardcopy "$session" 2>/dev/null | tail -n "$lines" || echo "[could not capture]"
+  shpool hardcopy -- "$session" 2>/dev/null | tail -n "$lines" || echo "[could not capture]"
 }
 
 if [ "${1:-}" = "--preview" ]; then
@@ -16,7 +16,14 @@ fi
 
 if [ "${1:-}" = "--remote-preview" ]; then
   host="${2:-}"; session="${3:-}"; lines="${4:-$preview_lines}"
-  ssh ${S_SSH_MUX:-} "$host" shpool hardcopy "$session" 2>/dev/null | tail -n "$lines"
+  ssh_options=()
+  if [ -n "${S_SSH_MUX:-}" ]; then
+    read -r -a ssh_options <<< "$S_SSH_MUX"
+  fi
+  printf -v remote_command 'shpool hardcopy -- %q' "$session"
+  # remote_command is shell-escaped above before ssh passes it to the remote shell.
+  # shellcheck disable=SC2029
+  ssh "${ssh_options[@]}" "$host" "$remote_command" 2>/dev/null | tail -n "$lines"
   exit 0
 fi
 
@@ -39,23 +46,29 @@ if [ $# -ge 1 ] && [[ "$1" == @* ]]; then
   if [ $# -ge 1 ]; then
     # s @host name — attach or create named session
     name="$1"
-    exec ssh -t "${ssh_mux[@]}" "$remote_host" shpool attach -f "$name"
+    printf -v remote_command 'exec shpool attach -f -- %q' "$name"
+    exec ssh -t "${ssh_mux[@]}" "$remote_host" "$remote_command"
   fi
 
   # s @host — pick from remote sessions
   sessions=()
   while read -r name status; do
     sessions+=("${name}	${name}	${status}")
-  done < <(ssh "${ssh_mux[@]}" "$remote_host" shpool list 2>/dev/null | tail -n +2 | awk -F'\t' '{print $1, $3}' | sort)
+  done < <(ssh "${ssh_mux[@]}" "$remote_host" shpool list 2>/dev/null | tail -n +2 | awk -F'\t' '{sub(/[[:space:]]+$/, "", $1); print $1, $NF}' | sort)
 
   if [ "${#sessions[@]}" -eq 0 ]; then
-    exec ssh -t "${ssh_mux[@]}" "$remote_host" shpool attach "$(date +%Y-%m-%d)"
+    name="$(date +%Y-%m-%d)"
+    printf -v remote_command 'exec shpool attach -- %q' "$name"
+    exec ssh -t "${ssh_mux[@]}" "$remote_host" "$remote_command"
   fi
 
   if command -v fzf >/dev/null 2>&1; then
     # list needs: sessions + prompt + header + border lines
     preview_size=$(( $(tput lines 2>/dev/null || echo 40) - ${#sessions[@]} - 7 ))
     [ "$preview_size" -lt 3 ] && preview_size=3
+    printf -v preview_command 'S_SSH_MUX=%q %q --remote-preview %q {1} %s' \
+      '-o ControlMaster=auto -o ControlPath=/tmp/.s-ssh-%r@%h:%p -o ControlPersist=5m' \
+      "$0" "$remote_host" "\$FZF_PREVIEW_LINES"
     selected="$(
       printf '%s\n' "${sessions[@]}" \
         | fzf \
@@ -70,7 +83,7 @@ if [ $# -ge 1 ] && [[ "$1" == @* ]]; then
           --listen \
           --bind "start:execute-silent(while sleep 1; do curl -s -XPOST localhost:\$FZF_PORT -d refresh-preview || break; done &)" \
           --preview-window="down,${preview_size},follow" \
-          --preview "S_SSH_MUX='-o ControlMaster=auto -o ControlPath=/tmp/.s-ssh-%r@%h:%p -o ControlPersist=5m' $0 --remote-preview ${remote_host} {1} \$FZF_PREVIEW_LINES"
+          --preview "$preview_command"
     )"
     [ -z "${selected:-}" ] && exit 0
     name="$(printf '%s' "$selected" | cut -f1)"
@@ -91,29 +104,31 @@ if [ $# -ge 1 ] && [[ "$1" == @* ]]; then
     name="$(echo "${sessions[$((choice - 1))]}" | cut -f1)"
   fi
 
-  exec ssh -t "${ssh_mux[@]}" "$remote_host" shpool attach -f "$name"
+  printf -v remote_command 'exec shpool attach -f -- %q' "$name"
+  exec ssh -t "${ssh_mux[@]}" "$remote_host" "$remote_command"
 fi
 
 # s <name> — attach or create
 if [ $# -ge 1 ]; then
   name="$1"
-  exec shpool attach -f "$name"
+  exec shpool attach -f -- "$name"
 fi
 
 # s (no args) — pick from running sessions
 sessions=()
 while read -r name status; do
   sessions+=("${name}	${name}	${status}")
-done < <(shpool list 2>/dev/null | tail -n +2 | awk -F'\t' '{print $1, $3}' | sort)
+done < <(shpool list 2>/dev/null | tail -n +2 | awk -F'\t' '{sub(/[[:space:]]+$/, "", $1); print $1, $NF}' | sort)
 
 if [ "${#sessions[@]}" -eq 0 ]; then
-  exec shpool attach "$(date +%Y-%m-%d)"
+  exec shpool attach -- "$(date +%Y-%m-%d)"
 fi
 
 if command -v fzf >/dev/null 2>&1; then
   # list needs: sessions + prompt + header + border lines
   preview_size=$(( $(tput lines 2>/dev/null || echo 40) - ${#sessions[@]} - 7 ))
   [ "$preview_size" -lt 3 ] && preview_size=3
+  printf -v preview_command '%q --preview {1} %s' "$0" "\$FZF_PREVIEW_LINES"
   selected="$(
     printf '%s\n' "${sessions[@]}" \
       | fzf \
@@ -128,7 +143,7 @@ if command -v fzf >/dev/null 2>&1; then
         --listen \
         --bind "start:execute-silent(while sleep 1; do curl -s -XPOST localhost:\$FZF_PORT -d refresh-preview || break; done &)" \
         --preview-window="down,${preview_size},follow" \
-        --preview "$0 --preview {1} \$FZF_PREVIEW_LINES"
+        --preview "$preview_command"
   )"
   [ -z "${selected:-}" ] && exit 0
   name="$(printf '%s' "$selected" | cut -f1)"
@@ -149,4 +164,4 @@ else
   name="$(echo "${sessions[$((choice - 1))]}" | cut -f1)"
 fi
 
-exec shpool attach -f "$name"
+exec shpool attach -f -- "$name"
