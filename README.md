@@ -37,8 +37,13 @@ When `s` attaches to a session, it shows the shpool session name as an iTerm2
 badge overlay. The badge is cleared when the attachment ends, including after
 an attachment error. This also works for sessions selected with `s @host`.
 
-To include the same session name in the iTerm2 tab title, add this to your
-`~/.bashrc` (or equivalent):
+`s` also sets the iTerm2 user variable `shpool_session_name` when it attaches,
+so you can use `\(user.shpool_session_name)` in your profile's tab title. It's
+set before attaching because reattaching to a session only redraws its screen
+and doesn't run the session shell's prompt.
+
+Alternatively, to set the terminal title from the shell inside the session, add
+this to your `~/.bashrc` (or equivalent):
 
 ```bash
 case "$TERM" in
