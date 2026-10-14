@@ -19,11 +19,20 @@ clear_iterm2_badge() {
   set_iterm2_badge ""
 }
 
+# Reattaching doesn't re-run the session shell's PROMPT_COMMAND (shpool only
+# redraws the screen), so set the var the tab title uses up front.
+set_iterm2_session_var() {
+  local value="$1" encoded
+  encoded="$(printf '%s' "$value" | base64 | tr -d '\r\n')"
+  printf '\033]1337;SetUserVar=shpool_session_name=%s\007' "$encoded"
+}
+
 attach_with_badge() {
   local name="$1" status
   shift
 
   set_iterm2_badge "$name"
+  set_iterm2_session_var "$name"
   trap clear_iterm2_badge EXIT
   if "$@"; then
     status=0
